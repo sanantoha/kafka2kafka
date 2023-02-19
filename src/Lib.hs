@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Lib(run, Config(..)) where
 
@@ -82,20 +83,21 @@ processMessages topicProducer producer consumer = do
 
     where parseMsg consumerRecord = let key = crKey consumerRecord
                                         message = crValue consumerRecord
-                                    in (maybe "" unpack key, maybe "" unpack message)
+                                        headers = fmap (\(k, v) -> (unpack k, unpack v)) . headersToList . crHeaders $ consumerRecord
+                                    in (headers, maybe "" unpack key, maybe "" unpack message)
 
           handleMsg (Left (KafkaResponseError _)) = putStrLn "no msgs"
           handleMsg (Left err) = putStrLn $ show err 
-          handleMsg (Right (key, value)) = do
-                                                putStrLn $ "Message: key=" <> key <> " value=" <> value
-                                                let record = mkMessage topicProducer (Just $ pack key) (Just $ pack value)
-                                                res <- sendMessageSync producer record
-                                                putStrLn . show $ res
-                                                handleSentMsg res
+          handleMsg (Right (headers, key, value)) = do
+                        putStrLn $ "Message: headers=" <> show headers <> "\n         key=" <> key <> " value=" <> value
+                        let record = mkMessage topicProducer headers (Just $ pack key) (Just $ pack value)
+                        res <- sendMessageSync producer record
+                        putStrLn . show $ res
+                        handleSentMsg res
 
           handleSentMsg (Right _) = do
-                                        err <- commitAllOffsets OffsetCommit consumer
-                                        putStrLn $ "Offsets: " <> maybe "Committed." show err
+                        err <- commitAllOffsets OffsetCommit consumer
+                        putStrLn $ "Offsets: " <> maybe "Committed." show err
           handleSentMsg (Left err) =  putStrLn . show $ err
 
 
@@ -127,10 +129,11 @@ sendMessageSync producer record = liftIO $ do
         NoMessageError err       -> Left err
 
 
-mkMessage :: String -> Maybe ByteString -> Maybe ByteString -> ProducerRecord
-mkMessage t k v = ProducerRecord
+mkMessage :: String -> [(String, String)] -> Maybe ByteString -> Maybe ByteString -> ProducerRecord
+mkMessage t h k v = ProducerRecord
                   { prTopic = TopicName . T.pack $ t
                   , prPartition = UnassignedPartition
                   , prKey = k
                   , prValue = v
+                  , prHeaders = headersFromList . fmap (\(k, v) -> (pack k, pack v)) $ h
                   }
