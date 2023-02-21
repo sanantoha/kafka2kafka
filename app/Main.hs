@@ -15,8 +15,17 @@ main = do
 parse :: [String] -> IO Config
 parse ["-h"] = usage >> exit
 parse ["-v"] = version >> exit
-parse xs = do
-  let config = parseConfig (Config { bootstrapConsumer = "", bootstrapProducer = "", topicConsumer = "", topicProducer = "" }) xs
+parse xss = do
+  let config = parseConfig (Config 
+                              { 
+                                bootstrapConsumer = "", 
+                                bootstrapProducer = "", 
+                                topicConsumer = "", 
+                                topicProducer = "",
+                                configCertsConsumer = Nothing,
+                                configCertsProducer = Nothing
+                              }
+                            ) xss
   case config of
       c@Config { bootstrapConsumer = bc, bootstrapProducer = bp, topicConsumer = tc, topicProducer = tp } -> 
           if bc == "" || bp == "" || tc == "" || tp == "" then usage >> exit
@@ -29,11 +38,39 @@ parse xs = do
                                         | x == "-bp" = parseConfig config { bootstrapProducer = y } xs
                                         | x == "-tc" = parseConfig config { topicConsumer = y } xs
                                         | x == "-tp" = parseConfig config { topicProducer = y } xs
+                                        | x == "-pc" = applyCertFuncConsumer addProtocolToConfigCerts config y xs
+                                        | x == "-calc" = applyCertFuncConsumer addCaLocation config y xs
+                                        | x == "-certlc" = applyCertFuncConsumer addCertificateLocation config y xs
+                                        | x == "-keylc" = applyCertFuncConsumer addKeyLocation config y xs
                                         | otherwise = parseConfig config xs
+
+            defaultConfigCerts = ConfigCerts { protocol = "", caLocation = "", certificateLocation = "", keyLocation = "" }
+
+            applyCertFuncConsumer f config val xs = do
+                                        let configCerts = f config val
+                                        parseConfig config { configCertsConsumer = Just configCerts } xs
+
+            addProtocolToConfigCerts config val = maybe (defaultConfigCerts { protocol = val }) (\cc -> cc { protocol = val }) (configCertsConsumer config)
+
+            addCaLocation config val = maybe (defaultConfigCerts { caLocation = val }) (\cc -> cc { caLocation = val }) (configCertsConsumer config)
+
+            addCertificateLocation config val = maybe (defaultConfigCerts { certificateLocation = val }) (\cc -> cc { certificateLocation = val }) (configCertsConsumer config)
+
+            addKeyLocation config val = maybe (defaultConfigCerts {keyLocation = val} ) (\cc -> cc { keyLocation = val })  (configCertsConsumer config)
+
+            applyCertFuncProducer f config val xs = do
+                                        let configCerts = f config val
+                                        parseConfig config { configCertsProducer = Just configCerts } xs
+
+            
   
   
+usage :: IO ()
 usage = putStrLn "Usage: [-vh] -bc kafka_consumer_bootstrap:9092 -bp kafka_producer_bootstrap:9092 -tc topic_consumer -tp topic_producer"
 
+version :: IO ()
 version = putStrLn "0.001"
+
+exit :: IO a
 exit = exitWith ExitSuccess
 

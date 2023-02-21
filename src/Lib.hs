@@ -3,7 +3,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Lib(run, Config(..)) where
+module Lib(run, Config(..), ConfigCerts(..)) where
 
 
 import Control.Exception (bracket)
@@ -22,9 +22,18 @@ import qualified Data.Text as T
 
 data Config = Config {
   bootstrapConsumer :: String,
-  bootstrapProducer :: String,
+  bootstrapProducer :: String,  
   topicConsumer :: String,
-  topicProducer :: String
+  topicProducer :: String,
+  configCertsConsumer :: Maybe ConfigCerts,
+  configCertsProducer :: Maybe ConfigCerts
+} deriving Show
+
+data ConfigCerts = ConfigCerts {
+    protocol :: String,
+    caLocation :: String,
+    certificateLocation :: String,
+    keyLocation :: String
 } deriving Show
 
 
@@ -73,7 +82,7 @@ run (Config { bootstrapConsumer = bc, bootstrapProducer = bp, topicConsumer = tc
 
 -------------------------------------------------------------------
 processMessages :: String -> KafkaProducer -> KafkaConsumer -> IO (Either KafkaError ())
-processMessages topicProducer producer consumer = do
+processMessages topicNameProducer producer consumer = do
     mapM_ (\_ -> do
                     msg <- pollMessage consumer (Timeout 1000)
                     let parsedMsg = parseMsg <$> msg
@@ -90,7 +99,7 @@ processMessages topicProducer producer consumer = do
           handleMsg (Left err) = putStrLn $ show err 
           handleMsg (Right (headers, key, value)) = do
                         putStrLn $ "Message: headers=" <> show headers <> "\n         key=" <> key <> " value=" <> value
-                        let record = mkMessage topicProducer headers (Just $ pack key) (Just $ pack value)
+                        let record = mkMessage topicNameProducer headers (Just $ pack key) (Just $ pack value)
                         res <- sendMessageSync producer record
                         putStrLn . show $ res
                         handleSentMsg res
@@ -135,5 +144,5 @@ mkMessage t h k v = ProducerRecord
                   , prPartition = UnassignedPartition
                   , prKey = k
                   , prValue = v
-                  , prHeaders = headersFromList . fmap (\(k, v) -> (pack k, pack v)) $ h
+                  , prHeaders = headersFromList . fmap (\(key, val) -> (pack key, pack val)) $ h
                   }
