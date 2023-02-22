@@ -42,25 +42,31 @@ parse xss = do
                                         | x == "-calc" = applyCertFuncConsumer addCaLocation config y xs
                                         | x == "-certlc" = applyCertFuncConsumer addCertificateLocation config y xs
                                         | x == "-keylc" = applyCertFuncConsumer addKeyLocation config y xs
+                                        | x == "-pp" = applyCertFuncProducer addProtocolToConfigCerts config y xs
+                                        | x == "-calp" = applyCertFuncProducer addCaLocation config y xs
+                                        | x == "-certlp" = applyCertFuncProducer addCertificateLocation config y xs
+                                        | x == "-keylp" = applyCertFuncProducer addKeyLocation config y xs
                                         | otherwise = parseConfig config xs
 
-            defaultConfigCerts = ConfigCerts { protocol = "", caLocation = "", certificateLocation = "", keyLocation = "" }
+            defaultConfigCerts = ConfigCerts { protocol = "", caLocation = "", certificateLocation = "", keyLocation = "" }            
 
             applyCertFuncConsumer f config val xs = do
-                                        let configCerts = f config val
+                                        let configCerts = f (configCertsConsumer config) val
                                         parseConfig config { configCertsConsumer = Just configCerts } xs
 
-            addProtocolToConfigCerts config val = maybe (defaultConfigCerts { protocol = val }) (\cc -> cc { protocol = val }) (configCertsConsumer config)
-
-            addCaLocation config val = maybe (defaultConfigCerts { caLocation = val }) (\cc -> cc { caLocation = val }) (configCertsConsumer config)
-
-            addCertificateLocation config val = maybe (defaultConfigCerts { certificateLocation = val }) (\cc -> cc { certificateLocation = val }) (configCertsConsumer config)
-
-            addKeyLocation config val = maybe (defaultConfigCerts {keyLocation = val} ) (\cc -> cc { keyLocation = val })  (configCertsConsumer config)
-
             applyCertFuncProducer f config val xs = do
-                                        let configCerts = f config val
+                                        let configCerts = f (configCertsProducer config) val
                                         parseConfig config { configCertsProducer = Just configCerts } xs
+
+            addProtocolToConfigCerts configCerts val = maybe (defaultConfigCerts { protocol = val }) (\cc -> cc { protocol = val }) configCerts
+
+            addCaLocation configCerts val = maybe (defaultConfigCerts { caLocation = val }) (\cc -> cc { caLocation = val }) configCerts
+
+            addCertificateLocation configCerts val = maybe (defaultConfigCerts { certificateLocation = val }) (\cc -> cc { certificateLocation = val }) configCerts
+
+            addKeyLocation configCerts val = maybe (defaultConfigCerts { keyLocation = val } ) (\cc -> cc { keyLocation = val })  configCerts
+
+            
 
             
   

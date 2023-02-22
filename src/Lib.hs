@@ -18,6 +18,7 @@ import Data.ByteString.Char8   (pack, unpack)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import Control.Monad.IO.Class  (MonadIO(..))
 import qualified Data.Text as T
+import qualified Data.Map as Map
 
 
 data Config = Config {
@@ -38,11 +39,27 @@ data ConfigCerts = ConfigCerts {
 
 
 -- Global consumer properties
-consumerProps :: String -> ConsumerProperties
-consumerProps bc = C.brokersList [BrokerAddress . T.pack $ bc]
-                <> groupId "Topic1ConsumerGroupNew00006"
-                <> noAutoCommit
-                <> C.logLevel KafkaLogInfo
+consumerProps :: String -> ConsumerProperties -> ConsumerProperties
+consumerProps bc extraConsumerProps = C.brokersList [BrokerAddress . T.pack $ bc]
+                                    <> groupId "kafka2kafka0001"
+                                    <> noAutoCommit
+                                    <> C.logLevel KafkaLogInfo
+                                    <> extraConsumerProps
+
+
+mapConfigCerts :: ConfigCerts -> Map.Map T.Text T.Text
+mapConfigCerts (ConfigCerts { 
+                                    protocol = prot, 
+                                    caLocation = caLoc, 
+                                    certificateLocation = certLoc, 
+                                    keyLocation = keyLoc 
+                                }) = Map.fromList [
+                            ("security.protocol", T.pack prot),
+                            ("ssl.ca.location", T.pack caLoc ),
+                            ("ssl.certificate.location", T.pack certLoc ),
+                            ("ssl.key.location", T.pack keyLoc )
+                        ]
+                        
 
 
 -- Subscription to topics
@@ -51,19 +68,30 @@ consumerSub topic = topics [TopicName . T.pack $ topic]
                 <> offsetReset Earliest
 
 -- Global producer properties
-producerProps :: String -> ProducerProperties
-producerProps bp = P.brokersList [BrokerAddress . T.pack $ bp]
-                <> P.logLevel KafkaLogDebug        
+producerProps :: String -> ProducerProperties -> ProducerProperties
+producerProps bp extraProducerProps = P.brokersList [BrokerAddress . T.pack $ bp]
+                                    <> P.logLevel KafkaLogDebug        
+                                    <> extraProducerProps
 
 
 run :: Config -> IO ()
-run (Config { bootstrapConsumer = bc, bootstrapProducer = bp, topicConsumer = tc, topicProducer = tp }) = do
+run (Config { 
+                bootstrapConsumer = bc, 
+                bootstrapProducer = bp, 
+                topicConsumer = tc, 
+                topicProducer = tp,
+                configCertsConsumer = ccc,
+                configCertsProducer = ccp
+            }) = do
         res <- bracket pk closeResources runHandler
         print res
         where 
-            mkConsumer = newConsumer (consumerProps bc) (consumerSub tc)
+            extraConsumerProps = maybe mempty C.extraProps . fmap mapConfigCerts $ ccc
+            extraProducerProps = maybe mempty P.extraProps . fmap mapConfigCerts $ ccp
 
-            mkProducer = newProducer (producerProps bp)
+            mkConsumer = newConsumer (consumerProps bc extraConsumerProps) (consumerSub tc)
+
+            mkProducer = newProducer (producerProps bp extraProducerProps)
 
             pk = (\p c -> (p, c)) <$> mkProducer <*> mkConsumer
 

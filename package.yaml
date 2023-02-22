@@ -21,10 +21,10 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
+- containers
 - hw-kafka-client
 - text
 - bytestring
-- containers
 
 ghc-options:
 - -Wall
