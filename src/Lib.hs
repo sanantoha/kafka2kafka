@@ -86,12 +86,11 @@ run (Config {
         res <- bracket pk closeResources runHandler
         print res
         where 
-            extraConsumerProps = maybe mempty C.extraProps . fmap mapConfigCerts $ ccc
-            extraProducerProps = maybe mempty P.extraProps . fmap mapConfigCerts $ ccp
+            mkExtraProps f = maybe mempty f . fmap mapConfigCerts
 
-            mkConsumer = newConsumer (consumerProps bc extraConsumerProps) (consumerSub tc)
+            mkConsumer = newConsumer (consumerProps bc . mkExtraProps C.extraProps $ ccc) (consumerSub tc)
 
-            mkProducer = newProducer (producerProps bp extraProducerProps)
+            mkProducer = newProducer (producerProps bp . mkExtraProps P.extraProps $ ccp)
 
             pk = (\p c -> (p, c)) <$> mkProducer <*> mkConsumer
 
