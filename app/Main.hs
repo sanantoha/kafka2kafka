@@ -2,6 +2,7 @@ module Main (main) where
 
 import System.Environment
 import System.Exit
+import Kafka2kafka.Entity.Config
 import Lib
 
 main :: IO ()

@@ -61,3 +61,7 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - kafka2kafka
+    - hspec
+    - QuickCheck
+    - containers
+    - hw-kafka-client
